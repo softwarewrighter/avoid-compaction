@@ -47,6 +47,11 @@ fn print_first_step(saga_name: &str, plan: &str) {
         println!("{plan}");
         println!();
     }
+    println!("--- Note ---");
+    println!("  .avoid-compaction/ is an APPEND-ONLY history store.");
+    println!("  Never delete, overwrite, or truncate any files in it.");
+    println!("  The tool selectively shows you only what you need.");
+    println!();
     println!("--- Checklist ---");
     println!("  [ ] Review the plan above");
     println!("  [ ] Do the first unit of work");
