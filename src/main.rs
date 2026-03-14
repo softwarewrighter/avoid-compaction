@@ -44,14 +44,19 @@ SESSION LOOP (every session, every step):
   1. avoid-compaction next
   2. Do the work described by the step prompt
   3. avoid-compaction plan --update <revised-plan>   (if the plan needs changes)
-  4. Commit your code changes
-  5. avoid-compaction complete --summary \"what was done\" \\
+  4. Run ALL pre-commit quality gates (tests, lints, formatting)
+  5. git commit -- you MUST commit before running complete
+  6. avoid-compaction complete --summary \"what was done\" \\
        --next-slug <slug> --next-prompt \"what to do next\" \\
        --next-context file1.rs,file2.rs \\
        --planned \"future-slug: description\" \\
        --planned \"another-slug: another description\"
-  6. Tell the user: \"Step N complete. Restart Claude and run:
+  7. Tell the user: \"Step N complete. Restart Claude and run:
        avoid-compaction next\"
+
+CRITICAL: Steps 4-5 are mandatory. NEVER run 'complete' with uncommitted changes. \
+The commit preserves your work; 'complete' only records metadata for the next agent. \
+If you skip the commit, the next agent has no code to build on.
 
 IMPORTANT -- always use --planned with 'complete' to list upcoming steps you can \
 foresee. This gives future agents visibility into the roadmap. If all work is \
