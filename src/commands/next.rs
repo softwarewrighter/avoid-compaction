@@ -55,6 +55,7 @@ pub fn run(saga_path: &Path) -> Result<u8> {
         &step_config,
         &step_dir,
         &saga_dir,
+        saga_path,
     )
 }
 
@@ -95,6 +96,7 @@ fn print_checklist(
     current: &crate::StepConfig,
     current_dir: &Path,
     saga_dir: &Path,
+    saga_root: &Path,
 ) -> Result<u8> {
     println!("=== Saga: {saga_name} ===");
     println!();
@@ -110,7 +112,7 @@ fn print_checklist(
     print_step0_summary(steps, saga_dir)?;
     print_last_completed_summary(steps)?;
     print_current_prompt(current, current_dir)?;
-    print_context_files(current);
+    print_context_files(current, saga_root);
     print_when_done(current);
 
     Ok(0)
@@ -196,11 +198,16 @@ fn print_current_prompt(current: &crate::StepConfig, current_dir: &Path) -> Resu
     Ok(())
 }
 
-fn print_context_files(current: &crate::StepConfig) {
+fn print_context_files(current: &crate::StepConfig, saga_root: &Path) {
     if !current.context_files.is_empty() {
         println!("--- Read these files for context ---");
         for f in &current.context_files {
-            println!("  {f}");
+            let full = saga_root.join(f);
+            if full.exists() {
+                println!("  {f}");
+            } else {
+                println!("  {f}  [WARNING: file not found]");
+            }
         }
         println!();
     }

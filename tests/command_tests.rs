@@ -444,6 +444,36 @@ fn install_hook_preserves_existing_settings() {
 }
 
 #[test]
+fn next_warns_about_missing_context_files() {
+    let tmp = tempdir().unwrap();
+    saga::init_saga(tmp.path(), "test", "plan").unwrap();
+
+    let saga_dir = saga::saga_dir(tmp.path());
+    step::create_step(
+        &saga_dir,
+        1,
+        "check-files",
+        "Do work",
+        "Check files",
+        &["src/real.rs".to_string(), "src/missing.rs".to_string()],
+    )
+    .unwrap();
+
+    // Create one of the two context files so only the other triggers a warning
+    let real_path = tmp.path().join("src");
+    std::fs::create_dir_all(&real_path).unwrap();
+    std::fs::write(real_path.join("real.rs"), "// exists").unwrap();
+
+    let mut config = saga::load_saga(tmp.path()).unwrap();
+    config.current_step = 1;
+    saga::save_saga(tmp.path(), &config).unwrap();
+
+    // The function should succeed (exit code 0) even with missing files
+    let code = next::run(tmp.path()).unwrap();
+    assert_eq!(code, 0);
+}
+
+#[test]
 fn install_hook_skips_if_already_configured() {
     let tmp = tempdir().unwrap();
     install_hook::run(tmp.path()).unwrap();
