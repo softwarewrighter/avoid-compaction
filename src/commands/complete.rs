@@ -142,5 +142,55 @@ pub fn run(saga_path: &Path, args: &CompleteArgs<'_>) -> Result<()> {
         println!("Warning: no next step defined. Use --next-slug and --next-prompt, or --done.");
     }
 
+    print_restart_message(&config, saga_path)?;
     Ok(())
+}
+
+fn print_restart_message(config: &crate::SagaConfig, saga_path: &Path) -> Result<()> {
+    let saga_dir = saga::saga_dir(saga_path);
+    let steps = step::list_steps(&saga_dir)?;
+
+    let completed_count = steps
+        .iter()
+        .filter(|(_, s)| s.status == crate::StepStatus::Completed)
+        .count();
+
+    println!();
+    println!("=== Status ===");
+
+    for (dir, s) in &steps {
+        if s.status == crate::StepStatus::Completed {
+            let summary = read_first_line_summary(dir);
+            println!("  [x] {:03}-{}: {}", s.number, s.slug, summary);
+        } else {
+            println!("  [ ] {:03}-{}: {}", s.number, s.slug, s.description);
+        }
+    }
+
+    println!();
+    if config.status == crate::SagaStatus::Completed {
+        println!(
+            "Saga '{}' is finished. All {completed_count} step(s) complete.",
+            config.name
+        );
+    } else {
+        let next_step = config.current_step;
+        println!(
+            "{completed_count} step(s) complete. Next up: step {:03}.",
+            next_step
+        );
+        println!("You may Ctrl-C and restart. The next agent will run 'avoid-compaction next'.");
+    }
+
+    Ok(())
+}
+
+fn read_first_line_summary(step_dir: &Path) -> String {
+    let summary_path = step_dir.join("summary.md");
+    if summary_path.is_file()
+        && let Ok(content) = std::fs::read_to_string(&summary_path)
+    {
+        return content.lines().next().unwrap_or("(done)").to_string();
+    }
+    "(no summary)".to_string()
 }

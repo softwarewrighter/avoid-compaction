@@ -1,6 +1,5 @@
 use crate::error::Result;
-use crate::saga;
-use crate::step;
+use crate::{StepStatus, saga, step};
 use std::path::Path;
 
 /// Exit codes: 0 = step available, 1 = saga complete, 2 = no saga
@@ -20,74 +19,132 @@ pub fn run(saga_path: &Path) -> Result<u8> {
     }
 
     let saga_dir = saga::saga_dir(saga_path);
+    let plan_path = saga_path.join(&config.plan_file);
+    let plan_content = if plan_path.is_file() {
+        std::fs::read_to_string(&plan_path)?
+    } else {
+        String::new()
+    };
 
     if config.current_step == 0 {
-        println!("=== FIRST STEP ===");
-        println!("Saga: {}", config.name);
-        println!("No prior context. This is the first step.");
-        println!("Plan: {}", config.plan_file);
-
-        let plan_path = saga_path.join(&config.plan_file);
-        if plan_path.is_file() {
-            println!("\n--- Plan ---");
-            println!("{}", std::fs::read_to_string(&plan_path)?);
-        }
-
-        println!("\nAction: Review the plan, do the first unit of work, then run:");
-        println!("  avoid-compaction complete --transcript <text> --summary <text> \\");
-        println!("    --next-slug <slug> --next-prompt <file> --next-context <files>");
+        print_first_step(&config.name, &plan_content);
         return Ok(0);
     }
 
-    // Find current step
+    let steps = step::list_steps(&saga_dir)?;
     let step_dir = step::find_step_dir(&saga_dir, config.current_step)?;
     let step_config = step::load_step(&step_dir)?;
 
-    // Print step info
-    println!(
-        "=== STEP {:03}: {} ===",
-        step_config.number, step_config.slug
-    );
-    println!("Status: {}", step_config.status);
-    println!("Description: {}", step_config.description);
+    print_checklist(&config.name, &plan_content, &steps, &step_config, &step_dir)
+}
 
-    // Print prompt
-    let prompt_path = step_dir.join("prompt.md");
-    if prompt_path.is_file() {
-        println!("\n--- Prompt ---");
-        println!("{}", std::fs::read_to_string(&prompt_path)?);
+fn print_first_step(saga_name: &str, plan: &str) {
+    println!("=== Saga: {saga_name} ===");
+    println!("Status: FIRST STEP (no prior work)");
+    println!();
+    if !plan.is_empty() {
+        println!("--- Plan ---");
+        println!("{plan}");
+        println!();
+    }
+    println!("--- Checklist ---");
+    println!("  [ ] Review the plan above");
+    println!("  [ ] Do the first unit of work");
+    println!("  [ ] Run: avoid-compaction complete --summary \"...\" \\");
+    println!("        --next-slug <slug> --next-prompt \"...\" --next-context <files>");
+    println!();
+    println!("When complete is done, tell the user they may Ctrl-C and restart.");
+}
+
+fn print_checklist(
+    saga_name: &str,
+    plan: &str,
+    steps: &[(std::path::PathBuf, crate::StepConfig)],
+    current: &crate::StepConfig,
+    current_dir: &Path,
+) -> Result<u8> {
+    println!("=== Saga: {saga_name} ===");
+    println!();
+
+    // Plan
+    if !plan.is_empty() {
+        println!("--- Plan ---");
+        println!("{plan}");
+        println!();
     }
 
-    // Print context files (paths only)
-    if !step_config.context_files.is_empty() {
-        println!("\n--- Context Files ---");
-        for f in &step_config.context_files {
-            println!("  {}", f);
+    // Step checklist: completed steps get [x], current gets [ ]
+    println!("--- Steps ---");
+    for (dir, s) in steps {
+        if s.status == StepStatus::Completed {
+            let summary = read_summary(dir);
+            println!("  [x] {:03}-{}: {}", s.number, s.slug, summary);
+        } else if s.number == current.number {
+            println!(
+                "  [ ] {:03}-{}: {} <-- YOU ARE HERE",
+                s.number, s.slug, s.description
+            );
+        } else {
+            println!("  [ ] {:03}-{}: {}", s.number, s.slug, s.description);
         }
     }
+    println!();
 
-    // Print prior step summaries (brief)
-    let steps = step::list_steps(&saga_dir)?;
-    let completed: Vec<_> = steps
+    // Full summary of the most recent completed step
+    let last_completed: Option<&(std::path::PathBuf, crate::StepConfig)> = steps
         .iter()
-        .filter(|(_, s)| s.status == crate::StepStatus::Completed)
-        .collect();
+        .rev()
+        .find(|(_, s)| s.status == StepStatus::Completed);
 
-    if !completed.is_empty() {
-        println!("\n--- Prior Steps ---");
-        for (dir, s) in &completed {
-            let summary_path = dir.join("summary.md");
-            let summary = if summary_path.is_file() {
-                let content = std::fs::read_to_string(&summary_path)?;
-                // First 3 lines only
-                content.lines().take(3).collect::<Vec<_>>().join(" ")
-            } else {
-                "(no summary)".to_string()
-            };
-            println!("  {:03}-{}: {}", s.number, s.slug, summary);
+    if let Some((dir, s)) = last_completed {
+        let summary_path = dir.join("summary.md");
+        if summary_path.is_file() {
+            let content = std::fs::read_to_string(&summary_path)?;
+            println!("--- Last completed: {:03}-{} ---", s.number, s.slug);
+            println!("{content}");
+            println!();
         }
     }
 
-    println!("\nPlan: {}", config.plan_file);
+    // Current step prompt
+    let prompt_path = current_dir.join("prompt.md");
+    if prompt_path.is_file() {
+        println!(
+            "--- Your task (step {:03}-{}) ---",
+            current.number, current.slug
+        );
+        println!("{}", std::fs::read_to_string(&prompt_path)?);
+        println!();
+    }
+
+    // Context files to read
+    if !current.context_files.is_empty() {
+        println!("--- Read these files for context ---");
+        for f in &current.context_files {
+            println!("  {f}");
+        }
+        println!();
+    }
+
+    // What to do when done
+    println!("--- When done ---");
+    println!("  Run: avoid-compaction complete --summary \"...\" \\");
+    println!("    --next-slug <slug> --next-prompt \"...\" --next-context <files>");
+    println!("  Or: avoid-compaction complete --summary \"...\" --done");
+    println!(
+        "  Then tell the user: \"Step {:03} complete. You may Ctrl-C and restart.\"",
+        current.number
+    );
+
     Ok(0)
+}
+
+fn read_summary(step_dir: &Path) -> String {
+    let summary_path = step_dir.join("summary.md");
+    if summary_path.is_file()
+        && let Ok(content) = std::fs::read_to_string(&summary_path)
+    {
+        return content.lines().next().unwrap_or("(done)").to_string();
+    }
+    "(no summary)".to_string()
 }
