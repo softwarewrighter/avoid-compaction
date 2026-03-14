@@ -1,15 +1,1 @@
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "command": "if [ -f .avoid-compaction/saga.toml ]; then avoid-compaction next 2>/dev/null || cargo run --quiet -- next; fi",
-            "type": "command"
-          }
-        ],
-        "matcher": ""
-      }
-    ]
-  }
-}
+{}

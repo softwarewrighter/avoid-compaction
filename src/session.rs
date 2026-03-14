@@ -11,18 +11,50 @@ use std::path::{Path, PathBuf};
 
 /// Derive the Claude projects directory name from a working directory path.
 /// Replaces `/` with `-` so `/Users/mike/proj` becomes `-Users-mike-proj`.
+/// Strips trailing dashes caused by trailing slashes in the input path.
 pub fn projects_dir_name(cwd: &Path) -> String {
     let abs = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
-    abs.to_string_lossy().replace('/', "-")
+    mangle_path(&abs)
+}
+
+/// Derive the directory name without canonicalization (raw path).
+/// Used as a fallback when the canonicalized name doesn't match Claude Code's naming.
+fn projects_dir_name_raw(cwd: &Path) -> String {
+    mangle_path(cwd)
+}
+
+/// Convert a path to the Claude projects dir name format.
+/// Replaces `/` with `-` and strips any trailing dash (from trailing slashes).
+fn mangle_path(path: &Path) -> String {
+    let name = path.to_string_lossy().replace('/', "-");
+    if name.len() > 1 {
+        name.trim_end_matches('-').to_string()
+    } else {
+        name
+    }
 }
 
 /// Return the full path to the Claude projects directory for a given cwd.
+/// Tries the canonicalized path first, then falls back to the raw path
+/// if the canonicalized directory doesn't exist. This handles cases where
+/// Claude Code may not canonicalize symlinks (e.g., `/tmp` vs `/private/tmp`).
 pub fn claude_projects_dir(cwd: &Path) -> Result<PathBuf> {
     let home =
         dirs::home_dir().ok_or_else(|| Error::Other("Cannot determine home directory".into()))?;
-    let dir_name = projects_dir_name(cwd);
-    let dir = home.join(".claude").join("projects").join(&dir_name);
-    Ok(dir)
+    let projects = home.join(".claude").join("projects");
+
+    let canonical_dir = projects.join(projects_dir_name(cwd));
+    if canonical_dir.is_dir() {
+        return Ok(canonical_dir);
+    }
+
+    let raw_dir = projects.join(projects_dir_name_raw(cwd));
+    if raw_dir.is_dir() {
+        return Ok(raw_dir);
+    }
+
+    // Neither exists; return the canonical path (will produce a clear error downstream)
+    Ok(canonical_dir)
 }
 
 /// Find all session JSONL files in a Claude projects directory.

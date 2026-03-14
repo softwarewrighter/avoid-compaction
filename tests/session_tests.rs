@@ -206,3 +206,20 @@ fn claude_projects_dir_constructs_path() {
     let path_str = path.to_string_lossy();
     assert!(path_str.contains(".claude/projects/"));
 }
+
+#[test]
+fn projects_dir_name_non_canonical_path() {
+    // A path that doesn't exist on disk can't be canonicalized,
+    // so projects_dir_name should fall back to the raw path.
+    let name = session::projects_dir_name(Path::new("/no/such/dir"));
+    assert_eq!(name, "-no-such-dir");
+}
+
+#[test]
+fn projects_dir_name_trailing_slash() {
+    // Trailing slashes should not produce a trailing dash
+    let name = session::projects_dir_name(Path::new("/some/path/"));
+    // Path::new normalizes trailing slash, so this should work
+    assert!(name.starts_with('-'));
+    assert!(!name.ends_with('-') || name == "-");
+}

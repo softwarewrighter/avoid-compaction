@@ -40,7 +40,7 @@ Tools `markdown-checker` and `sw-checklist` are in `~/.local/softwarewrighter/bi
 - **`src/saga.rs`** -- Saga file I/O: `init_saga`, `load_saga`, `save_saga`
 - **`src/step.rs`** -- Step file I/O and state machine: `create_step`, `transition_step`, `list_steps`
 - **`src/error.rs`** -- `thiserror`-derived error enum
-- **`src/commands/`** -- One module per CLI subcommand (`init`, `status`, `next`, `begin`, `complete`, `plan`, `transcript`, `history`, `list`, `abort`, `install_hook`)
+- **`src/commands/`** -- One module per CLI subcommand (`init`, `status`, `next`, `begin`, `complete`, `plan`, `transcript`, `history`, `list`, `abort`)
 - **`tests/`** -- Integration tests: `saga_tests.rs`, `step_tests.rs`, `command_tests.rs` (35+ tests using `tempfile` for isolation)
 
 ### Step Status State Machine
