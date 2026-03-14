@@ -11,53 +11,71 @@ use avoid_compaction::commands;
 )]
 #[command(long_about = "\
 Manages sagas (sequences of focused steps) so you can restart Claude frequently \
-without losing context. At the end of each session, save what happened and define \
-the next step. On restart, retrieve the next step's prompt and context file list.
+without losing context. Each session follows the same three-command loop:
 
-Typical workflow:
-  1. avoid-compaction init --name my-feature --plan plan.md
-  2. avoid-compaction next          # get current step prompt and context
-  3. avoid-compaction begin         # mark step in-progress
-  4. ... do the work ...
-  5. avoid-compaction complete --summary \"what was done\" \\
-       --next-slug add-tests --next-prompt prompt.md --next-context src/lib.rs
-  6. Restart Claude, go to step 2
+  avoid-compaction next       # what should I do?
+  ... do the work ...
+  avoid-compaction plan       # review/update the plan
+  avoid-compaction complete   # record what happened, define next step
 
-Session transcripts are captured automatically from Claude Code's JSONL session \
-files at ~/.claude/projects/. No need to use /export.
-
-Exit codes for 'next': 0 = step available, 1 = saga complete, 2 = no saga found.
+Then the user restarts Claude and pastes the command shown by 'complete'.
 
 AI CODING AGENT INSTRUCTIONS:
 
-This tool manages multi-session context continuity for AI coding agents. Use it \
-to checkpoint your work so the next session can pick up exactly where you left off.
-
-SESSION START (run at the beginning of each session):
+ALWAYS start every session by running:
   avoid-compaction next
-  Read the prompt and context files it outputs. These define your current task.
 
-SESSION END (run when finishing a task or before context gets too large):
-  avoid-compaction complete --summary \"Brief description of what was accomplished\" \\
-    --next-slug <short-name> --next-prompt <file-or-text> \\
-    --next-context src/foo.rs,src/bar.rs
-  The session JSONL is automatically snapshotted into .avoid-compaction/sessions/.
+This command has three possible outcomes:
 
-FIRST SESSION (no steps exist yet):
-  avoid-compaction init --name my-feature --plan \"Overall plan text\"
-  avoid-compaction complete --next-slug first-step --next-prompt \"Do X\"
+  Exit code 0 -- A step is ready. Read the prompt and context files it outputs. \
+Execute that step (implement a feature, fix a bug, run a spike, etc.). When done, \
+review/update the plan with 'avoid-compaction plan', then run 'complete'.
 
-KEY BEHAVIORS:
-  - 'complete' auto-snapshots the active ~/.claude/projects/ session JSONL
-  - 'transcript' reads from JSONL snapshots, showing user/assistant conversation
-  - 'history' shows summaries of all completed steps
-  - 'list' outputs context file paths for the current step
-  - '--done' on 'complete' marks the saga finished (no next step needed)
-  - Steps follow a state machine: pending -> in-progress -> completed|blocked
+  Exit code 2 -- No saga exists yet. This is the BEGINNING of a new project. \
+Your job is to focus on PLANNING, not implementation. Read any planning documents \
+the user has provided, understand the project goals, then:
+    avoid-compaction init --name <saga-name> --plan <plan-text-or-file>
+  Then run 'complete' to define the first implementation step.
+
+  Exit code 1 -- The saga is finished. Tell the user: \"All steps are complete. \
+The saga is done.\" Do NOT tell them to restart.
+
+SESSION LOOP (every session, every step):
+  1. avoid-compaction next
+  2. Do the work described by the step prompt
+  3. avoid-compaction plan --update <revised-plan>   (if the plan needs changes)
+  4. Commit your code changes
+  5. avoid-compaction complete --summary \"what was done\" \\
+       --next-slug <slug> --next-prompt \"what to do next\" \\
+       --next-context file1.rs,file2.rs \\
+       --planned \"future-slug: description\" \\
+       --planned \"another-slug: another description\"
+  6. Tell the user: \"Step N complete. Restart Claude and run:
+       avoid-compaction next\"
+
+IMPORTANT -- always use --planned with 'complete' to list upcoming steps you can \
+foresee. This gives future agents visibility into the roadmap. If all work is \
+done, use --done instead of --next-slug.
+
+COMPLETE COMMAND REFERENCE:
+  --summary    What you accomplished this step (required)
+  --next-slug  Short name for the next step, e.g. \"add-api-routes\"
+  --next-prompt  Instructions for the next agent (text, file path, or \"-\" for stdin)
+  --next-context  Comma-separated file paths the next agent should read
+  --planned    Repeatable. Future steps as \"slug: description\"
+  --done       No more steps -- marks the saga as complete
+
+OTHER COMMANDS:
+  status      Show current saga state
+  history     Show all completed step summaries
+  transcript  View session transcript for a step
+  list        List context files for the current step
+  plan        View or update the saga plan
+  abort       Mark current step as blocked (with optional --reason)
 
 DATA STORAGE:
-  All data is in .avoid-compaction/ (TOML configs, markdown content, JSONL snapshots).
-  Context files store paths only, not file contents -- read them yourself on restart.")]
+  All data is in .avoid-compaction/ (TOML configs, markdown content, JSONL snapshots). \
+Context files store paths only -- read them yourself on restart.")]
 struct Cli {
     /// Path to the saga's project directory (default: current directory)
     #[arg(long, default_value = ".")]
