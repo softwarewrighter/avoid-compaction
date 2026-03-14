@@ -9,19 +9,55 @@ use avoid_compaction::commands;
 #[command(
     about = "Session checkpoint tool for Claude Code — replace auto-compaction with deliberate context handoffs"
 )]
-#[command(
-    long_about = "Manages sagas (sequences of focused steps) so you can restart Claude frequently \
-    without losing context. At the end of each session, save what happened and define the next step. \
-    On restart, retrieve the next step's prompt and context file list.\n\n\
-    Typical workflow:\n  \
-    1. avoid-compaction init --name my-feature --plan plan.md\n  \
-    2. avoid-compaction next          # get current step (or 'first step' message)\n  \
-    3. avoid-compaction begin         # mark step in-progress\n  \
-    4. ... do the work ...\n  \
-    5. avoid-compaction complete --transcript <text> --summary <text> \\\n     \
-       --next-slug <slug> --next-prompt <file> --next-context src/a.rs,src/b.rs\n  \
-    6. Restart Claude, go to step 2"
-)]
+#[command(long_about = "\
+Manages sagas (sequences of focused steps) so you can restart Claude frequently \
+without losing context. At the end of each session, save what happened and define \
+the next step. On restart, retrieve the next step's prompt and context file list.
+
+Typical workflow:
+  1. avoid-compaction init --name my-feature --plan plan.md
+  2. avoid-compaction next          # get current step prompt and context
+  3. avoid-compaction begin         # mark step in-progress
+  4. ... do the work ...
+  5. avoid-compaction complete --summary \"what was done\" \\
+       --next-slug add-tests --next-prompt prompt.md --next-context src/lib.rs
+  6. Restart Claude, go to step 2
+
+Session transcripts are captured automatically from Claude Code's JSONL session \
+files at ~/.claude/projects/. No need to use /export.
+
+Exit codes for 'next': 0 = step available, 1 = saga complete, 2 = no saga found.
+
+AI CODING AGENT INSTRUCTIONS:
+
+This tool manages multi-session context continuity for AI coding agents. Use it \
+to checkpoint your work so the next session can pick up exactly where you left off.
+
+SESSION START (run at the beginning of each session):
+  avoid-compaction next
+  Read the prompt and context files it outputs. These define your current task.
+
+SESSION END (run when finishing a task or before context gets too large):
+  avoid-compaction complete --summary \"Brief description of what was accomplished\" \\
+    --next-slug <short-name> --next-prompt <file-or-text> \\
+    --next-context src/foo.rs,src/bar.rs
+  The session JSONL is automatically snapshotted into .avoid-compaction/sessions/.
+
+FIRST SESSION (no steps exist yet):
+  avoid-compaction init --name my-feature --plan \"Overall plan text\"
+  avoid-compaction complete --next-slug first-step --next-prompt \"Do X\"
+
+KEY BEHAVIORS:
+  - 'complete' auto-snapshots the active ~/.claude/projects/ session JSONL
+  - 'transcript' reads from JSONL snapshots, showing user/assistant conversation
+  - 'history' shows summaries of all completed steps
+  - 'list' outputs context file paths for the current step
+  - '--done' on 'complete' marks the saga finished (no next step needed)
+  - Steps follow a state machine: pending -> in-progress -> completed|blocked
+
+DATA STORAGE:
+  All data is in .avoid-compaction/ (TOML configs, markdown content, JSONL snapshots).
+  Context files store paths only, not file contents -- read them yourself on restart.")]
 struct Cli {
     /// Path to the saga's project directory (default: current directory)
     #[arg(long, default_value = ".")]
