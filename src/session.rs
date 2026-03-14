@@ -53,21 +53,6 @@ pub struct SessionRecord {
     pub content: String,
 }
 
-/// Parse a single JSONL line into a SessionRecord.
-fn parse_record(line: &str) -> Option<SessionRecord> {
-    let v: Value = serde_json::from_str(line).ok()?;
-    let record_type = v.get("type")?.as_str()?.to_string();
-    let timestamp = v
-        .get("timestamp")
-        .and_then(|t| t.as_str())
-        .map(|s| s.to_string());
-    Some(SessionRecord {
-        record_type,
-        timestamp,
-        content: line.to_string(),
-    })
-}
-
 /// Extract human-readable conversation text from a JSONL file.
 /// Returns user messages, assistant text, and tool summaries.
 pub fn extract_conversation(jsonl_path: &Path) -> Result<String> {
@@ -75,29 +60,27 @@ pub fn extract_conversation(jsonl_path: &Path) -> Result<String> {
     let mut output = String::new();
 
     for line in content.lines() {
-        let Some(record) = parse_record(line) else {
+        let Some(v) = serde_json::from_str::<Value>(line).ok() else {
             continue;
         };
-        let v: Value = match serde_json::from_str(&record.content) {
-            Ok(v) => v,
-            Err(_) => continue,
+        let Some(record_type) = v.get("type").and_then(|t| t.as_str()) else {
+            continue;
         };
+        let ts = v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("?");
 
-        match record.record_type.as_str() {
+        match record_type {
             "user" => {
                 if let Some(msg) = v.get("message") {
-                    let text = extract_message_text(msg);
+                    let text = extract_text_content(msg);
                     if !text.is_empty() {
-                        let ts = record.timestamp.as_deref().unwrap_or("?");
                         output.push_str(&format!("[{ts}] USER:\n{text}\n\n"));
                     }
                 }
             }
             "assistant" => {
                 if let Some(msg) = v.get("message") {
-                    let text = extract_assistant_text(msg);
+                    let text = extract_assistant_blocks(msg);
                     if !text.is_empty() {
-                        let ts = record.timestamp.as_deref().unwrap_or("?");
                         output.push_str(&format!("[{ts}] ASSISTANT:\n{text}\n\n"));
                     }
                 }
@@ -109,8 +92,8 @@ pub fn extract_conversation(jsonl_path: &Path) -> Result<String> {
     Ok(output)
 }
 
-/// Extract text content from a user message.
-fn extract_message_text(msg: &Value) -> String {
+/// Extract text content from a message's content field (string or array of text blocks).
+fn extract_text_content(msg: &Value) -> String {
     if let Some(content) = msg.get("content") {
         if let Some(s) = content.as_str() {
             return s.trim().to_string();
@@ -131,8 +114,8 @@ fn extract_message_text(msg: &Value) -> String {
     String::new()
 }
 
-/// Extract text blocks from an assistant message (skip tool_use blocks).
-fn extract_assistant_text(msg: &Value) -> String {
+/// Extract text and tool_use blocks from an assistant message.
+fn extract_assistant_blocks(msg: &Value) -> String {
     if let Some(arr) = msg.get("content").and_then(|c| c.as_array()) {
         let mut parts = Vec::new();
         for item in arr {

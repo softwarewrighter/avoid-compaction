@@ -50,12 +50,21 @@ Continued development with /init, analysis, and feature work.
 - **Agent doesn't know about the tool automatically**: The agent needs to be told (via CLAUDE.md, --help, or the plan) to use avoid-compaction. There is no automatic discovery.
 - **No validation of prompt quality**: The agent writes free-text prompts for the next step. Nothing enforces that the prompt is sufficient for a cold-start agent.
 
-### sw-checklist failures (pre-existing, not blocking)
+### sw-checklist failures (being addressed via refactoring spikes)
 
-- Function LOC: snapshot_session (53), run in complete.rs (133+), run in transcript.rs (101), run in next.rs, main (51)
-- Module function count: session.rs (9), step.rs (10)
-- Crate module count: 17 (max 7)
-- Missing: AI CODING AGENT INSTRUCTIONS in --help (now added), version fields, sw-install
+- Module function count: session.rs (9), next.rs (12), complete.rs (10), step.rs (10) -- max 7
+- Crate module count: 17 modules -- max 7
+- Aggressive target: 4 fn/module, 4 modules/crate, scale outward
+
+#### Refactoring Spike Sequence
+
+Tech debt spikes inserted before feature work to reach compliance:
+
+1. **Spike 1 -- merge-small-commands** (Low risk): Merge 7 single-function command modules into 2 (simple.rs + lifecycle.rs). Drops module count 17 to 12.
+2. **Spike 2 -- extract-display** (Medium risk): Extract shared display helpers from next.rs and complete.rs into display.rs. Fixes function counts.
+3. **Spike 3 -- create-workspace** (High risk): Convert to Cargo workspace, extract avoid-compaction-core crate (types, saga, step).
+4. **Spike 4 -- extract-session-crate** (Medium risk): Extract avoid-compaction-session crate (path, parse, snapshot).
+5. **Spike 5 -- reduce-binary-modules** (Medium risk): Final merge/extraction to reach 4 crates, each 3-4 modules, each 3-4 fn.
 
 ## Dogfooding Plan
 
