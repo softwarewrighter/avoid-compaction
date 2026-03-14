@@ -6,7 +6,6 @@ use avoid_compaction::commands;
 
 #[derive(Parser)]
 #[command(name = "avoid-compaction")]
-#[command(version = concat!(env!("CARGO_PKG_VERSION"), "-", env!("BUILD_VERSION")))]
 #[command(
     about = "Session checkpoint tool for Claude Code — replace auto-compaction with deliberate context handoffs"
 )]
@@ -168,6 +167,20 @@ enum Commands {
 }
 
 fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1 && (args[1] == "-V" || args[1] == "--version") {
+        println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        println!();
+        println!("Copyright (c) 2026 Michael A Wright");
+        println!("MIT License");
+        println!();
+        println!("Repository: https://github.com/softwarewrighter/avoid-compaction");
+        println!("Build Commit: {}", env!("BUILD_COMMIT"));
+        println!("Build Host: {}", env!("BUILD_HOST"));
+        println!("Build Time: {}", env!("BUILD_TIME"));
+        return ExitCode::SUCCESS;
+    }
+
     let cli = Cli::parse();
 
     match dispatch(&cli.saga, cli.command) {
