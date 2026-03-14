@@ -71,6 +71,7 @@ fn complete_first_step_creates_step_001() {
         next_prompt: Some("Implement feature X"),
         next_slug: Some("feature-x"),
         next_context: vec!["src/lib.rs".to_string()],
+        planned: vec![],
         done: false,
     };
 
@@ -98,6 +99,7 @@ fn complete_first_step_fails_without_next_info() {
         next_prompt: None,
         next_slug: None,
         next_context: vec![],
+        planned: vec![],
         done: false,
     };
 
@@ -116,6 +118,7 @@ fn complete_first_step_with_done_marks_saga_complete() {
         next_prompt: None,
         next_slug: None,
         next_context: vec![],
+        planned: vec![],
         done: true,
     };
 
@@ -158,6 +161,7 @@ fn full_workflow_init_through_done() {
         next_prompt: Some("Build the skeleton"),
         next_slug: Some("skeleton"),
         next_context: vec!["Cargo.toml".to_string()],
+        planned: vec![],
         done: false,
     };
     complete::run(tmp.path(), &args).unwrap();
@@ -176,6 +180,7 @@ fn full_workflow_init_through_done() {
         next_prompt: Some("Add core logic"),
         next_slug: Some("core-logic"),
         next_context: vec!["src/lib.rs".to_string()],
+        planned: vec![],
         done: false,
     };
     complete::run(tmp.path(), &args).unwrap();
@@ -194,6 +199,7 @@ fn full_workflow_init_through_done() {
         next_prompt: None,
         next_slug: None,
         next_context: vec![],
+        planned: vec![],
         done: true,
     };
     complete::run(tmp.path(), &args).unwrap();
@@ -227,6 +233,7 @@ fn complete_auto_transitions_pending_to_completed() {
         next_prompt: Some("Do step 1"),
         next_slug: Some("step-1"),
         next_context: vec![],
+        planned: vec![],
         done: false,
     };
     complete::run(tmp.path(), &args).unwrap();
@@ -238,6 +245,7 @@ fn complete_auto_transitions_pending_to_completed() {
         next_prompt: None,
         next_slug: None,
         next_context: vec![],
+        planned: vec![],
         done: true,
     };
     complete::run(tmp.path(), &args).unwrap();
@@ -295,6 +303,7 @@ fn complete_step0_saves_summary() {
         next_prompt: Some("Fix the widget"),
         next_slug: Some("fix-widget"),
         next_context: vec![],
+        planned: vec![],
         done: false,
     };
     complete::run(tmp.path(), &args).unwrap();
@@ -317,6 +326,7 @@ fn next_shows_step0_summary_for_first_real_step() {
         next_prompt: Some("Add error handling"),
         next_slug: Some("error-handling"),
         next_context: vec!["src/lib.rs".to_string()],
+        planned: vec![],
         done: false,
     };
     complete::run(tmp.path(), &args).unwrap();
@@ -328,6 +338,59 @@ fn next_shows_step0_summary_for_first_real_step() {
     // Verify step0-summary.md exists (next reads it internally)
     let summary_path = saga::saga_dir(tmp.path()).join("step0-summary.md");
     assert!(summary_path.is_file());
+}
+
+#[test]
+fn complete_saves_planned_steps() {
+    let tmp = tempdir().unwrap();
+    saga::init_saga(tmp.path(), "test", "plan").unwrap();
+
+    let args = CompleteArgs {
+        transcript: None,
+        summary: Some("Did initial work"),
+        next_prompt: Some("Do step 1"),
+        next_slug: Some("step-1"),
+        next_context: vec![],
+        planned: vec![
+            "step-2: Add error handling".to_string(),
+            "step-3: Write tests".to_string(),
+        ],
+        done: false,
+    };
+    complete::run(tmp.path(), &args).unwrap();
+
+    let planned_path = saga::saga_dir(tmp.path()).join("planned-steps.md");
+    assert!(planned_path.is_file());
+    let content = std::fs::read_to_string(&planned_path).unwrap();
+    assert!(content.contains("step-2: Add error handling"));
+    assert!(content.contains("step-3: Write tests"));
+}
+
+#[test]
+fn complete_removes_next_slug_from_planned() {
+    let tmp = tempdir().unwrap();
+    saga::init_saga(tmp.path(), "test", "plan").unwrap();
+
+    // Create step 1 with planned steps
+    let args = CompleteArgs {
+        transcript: None,
+        summary: None,
+        next_prompt: Some("Do step 1"),
+        next_slug: Some("step-1"),
+        next_context: vec![],
+        planned: vec![
+            "step-1: Build the thing".to_string(),
+            "step-2: Test the thing".to_string(),
+        ],
+        done: false,
+    };
+    complete::run(tmp.path(), &args).unwrap();
+
+    // step-1 was just created as the next step, so it should be removed from planned
+    let planned_path = saga::saga_dir(tmp.path()).join("planned-steps.md");
+    let content = std::fs::read_to_string(&planned_path).unwrap();
+    assert!(!content.contains("step-1:"));
+    assert!(content.contains("step-2: Test the thing"));
 }
 
 #[test]
