@@ -111,6 +111,10 @@ enum Commands {
         #[arg(long, value_delimiter = ',')]
         next_context: Vec<String>,
 
+        /// Planned future steps (repeatable), each "slug: description"
+        #[arg(long)]
+        planned: Vec<String>,
+
         /// Mark the saga as complete (no next step)
         #[arg(long)]
         done: bool,
@@ -146,23 +150,29 @@ enum Commands {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let saga_path = &cli.saga;
 
-    let result = match cli.command {
+    match dispatch(&cli.saga, cli.command) {
+        Ok(code) => ExitCode::from(code),
+        Err(e) => {
+            eprintln!("Error: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn dispatch(saga_path: &std::path::Path, command: Commands) -> avoid_compaction::error::Result<u8> {
+    match command {
         Commands::Init { name, plan } => commands::init::run(saga_path, &name, &plan).map(|_| 0u8),
-
         Commands::Status => commands::status::run(saga_path).map(|_| 0),
-
         Commands::Next => commands::next::run(saga_path),
-
         Commands::Begin => commands::begin::run(saga_path).map(|_| 0),
-
         Commands::Complete {
             transcript,
             summary,
             next_prompt,
             next_slug,
             next_context,
+            planned,
             done,
         } => {
             let args = commands::complete::CompleteArgs {
@@ -171,27 +181,15 @@ fn main() -> ExitCode {
                 next_prompt: next_prompt.as_deref(),
                 next_slug: next_slug.as_deref(),
                 next_context,
+                planned,
                 done,
             };
             commands::complete::run(saga_path, &args).map(|_| 0)
         }
-
         Commands::Plan { update } => commands::plan::run(saga_path, update.as_deref()).map(|_| 0),
-
         Commands::Transcript { step } => commands::transcript::run(saga_path, step).map(|_| 0),
-
         Commands::History => commands::history::run(saga_path).map(|_| 0),
-
         Commands::List => commands::list::run(saga_path).map(|_| 0),
-
         Commands::Abort { reason } => commands::abort::run(saga_path, reason.as_deref()).map(|_| 0),
-    };
-
-    match result {
-        Ok(code) => ExitCode::from(code),
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            ExitCode::from(1)
-        }
     }
 }

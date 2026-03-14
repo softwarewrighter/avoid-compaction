@@ -178,15 +178,18 @@ pub fn snapshot_session(saga_dir: &Path, cwd: &Path) -> Result<(PathBuf, usize)>
         .to_string();
 
     let snapshot_path = sessions_dir.join(format!("{session_name}.jsonl"));
+    let new_lines = append_new_lines(latest, &snapshot_path)?;
 
-    // Read the current source file
-    let source_content = std::fs::read_to_string(latest)?;
+    Ok((snapshot_path, new_lines))
+}
+
+/// Append lines from `source` that are not yet in `snapshot`. Returns count of new lines.
+fn append_new_lines(source: &Path, snapshot: &Path) -> Result<usize> {
+    let source_content = std::fs::read_to_string(source)?;
     let source_lines: Vec<&str> = source_content.lines().collect();
 
-    // Read existing snapshot to find how many lines we already have
-    let existing_lines = if snapshot_path.is_file() {
-        let existing = std::fs::read_to_string(&snapshot_path)?;
-        existing.lines().count()
+    let existing_lines = if snapshot.is_file() {
+        std::fs::read_to_string(snapshot)?.lines().count()
     } else {
         0
     };
@@ -194,7 +197,6 @@ pub fn snapshot_session(saga_dir: &Path, cwd: &Path) -> Result<(PathBuf, usize)>
     let new_lines = source_lines.len().saturating_sub(existing_lines);
 
     if new_lines > 0 {
-        // Append only the new lines
         let new_content: String = source_lines[existing_lines..]
             .iter()
             .map(|l| format!("{l}\n"))
@@ -204,11 +206,11 @@ pub fn snapshot_session(saga_dir: &Path, cwd: &Path) -> Result<(PathBuf, usize)>
         let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(&snapshot_path)?;
+            .open(snapshot)?;
         file.write_all(new_content.as_bytes())?;
     }
 
-    Ok((snapshot_path, new_lines))
+    Ok(new_lines)
 }
 
 /// Diff two snapshots of the same session, returning lines present in `older`

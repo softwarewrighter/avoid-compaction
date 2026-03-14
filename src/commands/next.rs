@@ -79,14 +79,24 @@ fn print_checklist(
     println!("=== Saga: {saga_name} ===");
     println!();
 
-    // Plan
     if !plan.is_empty() {
         println!("--- Plan ---");
         println!("{plan}");
         println!();
     }
 
-    // Step checklist: completed steps get [x], current gets [ ]
+    print_step_list(steps, current);
+    print_planned_steps(saga_dir);
+    print_step0_summary(steps, saga_dir)?;
+    print_last_completed_summary(steps)?;
+    print_current_prompt(current, current_dir)?;
+    print_context_files(current);
+    print_when_done(current);
+
+    Ok(0)
+}
+
+fn print_step_list(steps: &[(std::path::PathBuf, crate::StepConfig)], current: &crate::StepConfig) {
     println!("--- Steps ---");
     for (dir, s) in steps {
         if s.status == StepStatus::Completed {
@@ -102,8 +112,26 @@ fn print_checklist(
         }
     }
     println!();
+}
 
-    // Show step 0 summary if this is the first real step
+fn print_planned_steps(saga_dir: &Path) {
+    let planned_path = saga_dir.join("planned-steps.md");
+    if planned_path.is_file()
+        && let Ok(content) = std::fs::read_to_string(&planned_path)
+    {
+        for line in content.lines() {
+            if !line.trim().is_empty() {
+                println!("  ( ) {line}  (planned)");
+            }
+        }
+        println!();
+    }
+}
+
+fn print_step0_summary(
+    steps: &[(std::path::PathBuf, crate::StepConfig)],
+    saga_dir: &Path,
+) -> Result<()> {
     let step0_summary_path = saga_dir.join("step0-summary.md");
     if step0_summary_path.is_file() {
         let has_completed_steps = steps.iter().any(|(_, s)| s.status == StepStatus::Completed);
@@ -114,9 +142,11 @@ fn print_checklist(
             println!();
         }
     }
+    Ok(())
+}
 
-    // Full summary of the most recent completed step
-    let last_completed: Option<&(std::path::PathBuf, crate::StepConfig)> = steps
+fn print_last_completed_summary(steps: &[(std::path::PathBuf, crate::StepConfig)]) -> Result<()> {
+    let last_completed = steps
         .iter()
         .rev()
         .find(|(_, s)| s.status == StepStatus::Completed);
@@ -130,8 +160,10 @@ fn print_checklist(
             println!();
         }
     }
+    Ok(())
+}
 
-    // Current step prompt
+fn print_current_prompt(current: &crate::StepConfig, current_dir: &Path) -> Result<()> {
     let prompt_path = current_dir.join("prompt.md");
     if prompt_path.is_file() {
         println!(
@@ -141,8 +173,10 @@ fn print_checklist(
         println!("{}", std::fs::read_to_string(&prompt_path)?);
         println!();
     }
+    Ok(())
+}
 
-    // Context files to read
+fn print_context_files(current: &crate::StepConfig) {
     if !current.context_files.is_empty() {
         println!("--- Read these files for context ---");
         for f in &current.context_files {
@@ -150,18 +184,19 @@ fn print_checklist(
         }
         println!();
     }
+}
 
-    // What to do when done
+fn print_when_done(current: &crate::StepConfig) {
     println!("--- When done ---");
     println!("  Run: avoid-compaction complete --summary \"...\" \\");
     println!("    --next-slug <slug> --next-prompt \"...\" --next-context <files>");
     println!("  Or: avoid-compaction complete --summary \"...\" --done");
+    println!();
     println!(
-        "  Then tell the user: \"Step {:03} complete. You may Ctrl-C and restart.\"",
+        "  Then tell the user: \"Step {:03} complete. Restart and give the new agent:",
         current.number
     );
-
-    Ok(0)
+    println!("    avoid-compaction next\"");
 }
 
 fn read_summary(step_dir: &Path) -> String {
