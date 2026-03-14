@@ -81,6 +81,15 @@ pub fn read_input(value: &str) -> error::Result<String> {
     }
 }
 
+/// Truncate a string to `max` characters, appending "..." if truncated.
+pub fn truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}...", &s[..max.saturating_sub(3)])
+    }
+}
+
 /// Get current timestamp as YYYYMMDDTHHMMSS string.
 pub fn timestamp() -> String {
     chrono::Local::now().format("%Y%m%dT%H%M%S").to_string()

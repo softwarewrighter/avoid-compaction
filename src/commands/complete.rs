@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::{SagaStatus, StepStatus, read_input, saga, session, step};
+use crate::{SagaStatus, StepStatus, read_input, saga, session, step, truncate};
 use std::path::Path;
 
 pub struct CompleteArgs<'a> {
@@ -225,7 +225,7 @@ fn print_restart_message(config: &crate::SagaConfig, saga_path: &Path) -> Result
 
     for (dir, s) in &steps {
         if s.status == crate::StepStatus::Completed {
-            let summary = read_first_line_summary(dir);
+            let summary = truncate(&read_first_line_summary(dir), 72);
             println!("  [x] {:03}-{}: {}", s.number, s.slug, summary);
         } else {
             println!("  [ ] {:03}-{}: {}", s.number, s.slug, s.description);
@@ -245,7 +245,8 @@ fn print_restart_message(config: &crate::SagaConfig, saga_path: &Path) -> Result
             "{completed_count} step(s) complete. Next up: step {:03}.",
             next_step
         );
-        println!("You may Ctrl-C and restart. Give the new agent: avoid-compaction next");
+        let cmd = crate::commands::next::cmd_prefix();
+        println!("You may Ctrl-C and restart. Give the new agent: {cmd} next");
     }
 
     Ok(())

@@ -1,6 +1,19 @@
 use crate::error::Result;
-use crate::{StepStatus, saga, step};
+use crate::{StepStatus, saga, step, truncate};
 use std::path::Path;
+
+/// Return the command prefix for invoking this tool.
+/// Uses the binary name if installed, falls back to `cargo run --quiet --`.
+pub fn cmd_prefix() -> String {
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            if dir.join("avoid-compaction").is_file() {
+                return "avoid-compaction".to_string();
+            }
+        }
+    }
+    "cargo run --quiet --".to_string()
+}
 
 /// Exit codes: 0 = step available, 1 = saga complete, 2 = no saga
 pub fn run(saga_path: &Path) -> Result<u8> {
@@ -46,6 +59,7 @@ pub fn run(saga_path: &Path) -> Result<u8> {
 }
 
 fn print_first_step(saga_name: &str, plan: &str) {
+    let cmd = cmd_prefix();
     println!("=== Saga: {saga_name} ===");
     println!("Status: FIRST STEP (no prior work)");
     println!();
@@ -62,10 +76,11 @@ fn print_first_step(saga_name: &str, plan: &str) {
     println!("--- Checklist ---");
     println!("  [ ] Review the plan above");
     println!("  [ ] Do the first unit of work");
-    println!("  [ ] Run: avoid-compaction complete --summary \"...\" \\");
+    println!("  [ ] Run: {cmd} complete --summary \"...\" \\");
     println!("        --next-slug <slug> --next-prompt \"...\" --next-context <files>");
     println!();
-    println!("When complete is done, tell the user they may Ctrl-C and restart.");
+    println!("  Then tell the user: \"Restart and give the new agent:");
+    println!("    {cmd} next\"");
 }
 
 fn print_checklist(
@@ -100,7 +115,7 @@ fn print_step_list(steps: &[(std::path::PathBuf, crate::StepConfig)], current: &
     println!("--- Steps ---");
     for (dir, s) in steps {
         if s.status == StepStatus::Completed {
-            let summary = read_summary(dir);
+            let summary = truncate(&read_summary(dir), 72);
             println!("  [x] {:03}-{}: {}", s.number, s.slug, summary);
         } else if s.number == current.number {
             println!(
@@ -187,16 +202,19 @@ fn print_context_files(current: &crate::StepConfig) {
 }
 
 fn print_when_done(current: &crate::StepConfig) {
+    let cmd = cmd_prefix();
     println!("--- When done ---");
-    println!("  Run: avoid-compaction complete --summary \"...\" \\");
-    println!("    --next-slug <slug> --next-prompt \"...\" --next-context <files>");
-    println!("  Or: avoid-compaction complete --summary \"...\" --done");
+    println!("  1. Run pre-commit gates: cargo test, cargo clippy, cargo fmt");
+    println!("  2. Commit changes with a detailed message");
+    println!("  3. Run: {cmd} complete --summary \"...\" \\");
+    println!("       --next-slug <slug> --next-prompt \"...\" --next-context <files>");
+    println!("     Or: {cmd} complete --summary \"...\" --done");
     println!();
     println!(
         "  Then tell the user: \"Step {:03} complete. Restart and give the new agent:",
         current.number
     );
-    println!("    avoid-compaction next\"");
+    println!("    {cmd} next\"");
 }
 
 fn read_summary(step_dir: &Path) -> String {
