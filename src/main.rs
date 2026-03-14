@@ -146,6 +146,9 @@ enum Commands {
         #[arg(long)]
         reason: Option<String>,
     },
+
+    /// Install Claude Code SessionStart hook for automatic context injection
+    InstallHook,
 }
 
 fn main() -> ExitCode {
@@ -191,5 +194,6 @@ fn dispatch(saga_path: &std::path::Path, command: Commands) -> avoid_compaction:
         Commands::History => commands::history::run(saga_path).map(|_| 0),
         Commands::List => commands::list::run(saga_path).map(|_| 0),
         Commands::Abort { reason } => commands::abort::run(saga_path, reason.as_deref()).map(|_| 0),
+        Commands::InstallHook => commands::install_hook::run(saga_path).map(|_| 0),
     }
 }

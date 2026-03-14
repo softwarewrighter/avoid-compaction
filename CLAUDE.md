@@ -40,7 +40,7 @@ Tools `markdown-checker` and `sw-checklist` are in `~/.local/softwarewrighter/bi
 - **`src/saga.rs`** -- Saga file I/O: `init_saga`, `load_saga`, `save_saga`
 - **`src/step.rs`** -- Step file I/O and state machine: `create_step`, `transition_step`, `list_steps`
 - **`src/error.rs`** -- `thiserror`-derived error enum
-- **`src/commands/`** -- One module per CLI subcommand (`init`, `status`, `next`, `begin`, `complete`, `plan`, `transcript`, `history`, `list`, `abort`)
+- **`src/commands/`** -- One module per CLI subcommand (`init`, `status`, `next`, `begin`, `complete`, `plan`, `transcript`, `history`, `list`, `abort`, `install_hook`)
 - **`tests/`** -- Integration tests: `saga_tests.rs`, `step_tests.rs`, `command_tests.rs` (35+ tests using `tempfile` for isolation)
 
 ### Step Status State Machine
@@ -79,6 +79,10 @@ See `docs/analyze-projects.md` for the full JSONL format analysis.
 - Module docs use `//!`, item docs use `///`
 - Files < 500 lines (prefer 200-300), functions < 50 lines (prefer 10-30)
 - Max 3 TODOs per file, no FIXMEs in commits
+
+## Ratchet Rule (sw-checklist)
+
+`sw-checklist` measures project compliance. The current baseline is **7 passed, 11 failed, 24 warnings**. When adding code, you must not make this worse -- maintain or improve the counts. Take a baseline before starting work (`sw-checklist 2>&1 | tail -1`) and verify after. This is a ratchet: it only turns one way.
 
 ## TDD Workflow
 

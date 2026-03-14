@@ -73,7 +73,12 @@ fn print_first_step(saga_name: &str, plan: &str) {
     println!("  Never delete, overwrite, or truncate any files in it.");
     println!("  The tool selectively shows you only what you need.");
     println!();
+    println!("--- Setup ---");
+    println!("  Install the SessionStart hook so future sessions get context automatically:");
+    println!("  {cmd} install-hook");
+    println!();
     println!("--- Checklist ---");
+    println!("  [ ] Run: {cmd} install-hook");
     println!("  [ ] Review the plan above");
     println!("  [ ] Do the first unit of work");
     println!("  [ ] Run: {cmd} complete --summary \"...\" \\");

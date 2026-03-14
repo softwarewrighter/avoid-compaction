@@ -3,6 +3,7 @@ pub mod begin;
 pub mod complete;
 pub mod history;
 pub mod init;
+pub mod install_hook;
 pub mod list;
 pub mod next;
 pub mod plan;

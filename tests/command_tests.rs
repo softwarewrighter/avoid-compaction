@@ -1,5 +1,5 @@
 use avoid_compaction::commands::complete::CompleteArgs;
-use avoid_compaction::commands::{begin, complete, init, next, status};
+use avoid_compaction::commands::{begin, complete, init, install_hook, next, status};
 use avoid_compaction::saga;
 use avoid_compaction::step;
 use avoid_compaction::{SagaStatus, StepStatus};
@@ -402,4 +402,57 @@ fn init_fails_gracefully_when_saga_exists() {
     assert!(result.is_err());
     let err = result.unwrap_err().to_string();
     assert!(err.contains("already exists"));
+}
+
+#[test]
+fn install_hook_creates_settings_file() {
+    let tmp = tempdir().unwrap();
+    install_hook::run(tmp.path()).unwrap();
+
+    let settings_path = tmp.path().join(".claude/settings.json");
+    assert!(settings_path.is_file());
+
+    let content = std::fs::read_to_string(&settings_path).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert!(val["hooks"]["SessionStart"].is_array());
+
+    let hook_cmd = val["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+        .as_str()
+        .unwrap();
+    assert!(hook_cmd.contains("avoid-compaction next"));
+}
+
+#[test]
+fn install_hook_preserves_existing_settings() {
+    let tmp = tempdir().unwrap();
+    let claude_dir = tmp.path().join(".claude");
+    std::fs::create_dir_all(&claude_dir).unwrap();
+
+    let existing = serde_json::json!({"someKey": "someValue"});
+    std::fs::write(
+        claude_dir.join("settings.json"),
+        serde_json::to_string_pretty(&existing).unwrap(),
+    )
+    .unwrap();
+
+    install_hook::run(tmp.path()).unwrap();
+
+    let content = std::fs::read_to_string(claude_dir.join("settings.json")).unwrap();
+    let val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert_eq!(val["someKey"], "someValue");
+    assert!(val["hooks"]["SessionStart"].is_array());
+}
+
+#[test]
+fn install_hook_skips_if_already_configured() {
+    let tmp = tempdir().unwrap();
+    install_hook::run(tmp.path()).unwrap();
+
+    let content_before = std::fs::read_to_string(tmp.path().join(".claude/settings.json")).unwrap();
+
+    // Running again should not modify the file
+    install_hook::run(tmp.path()).unwrap();
+
+    let content_after = std::fs::read_to_string(tmp.path().join(".claude/settings.json")).unwrap();
+    assert_eq!(content_before, content_after);
 }
