@@ -1,5 +1,5 @@
 use crate::error::{Error, Result};
-use crate::{SagaStatus, StepStatus, read_input, saga, step};
+use crate::{SagaStatus, StepStatus, read_input, saga, session, step};
 use std::path::Path;
 
 pub struct CompleteArgs<'a> {
@@ -15,9 +15,25 @@ pub fn run(saga_path: &Path, args: &CompleteArgs<'_>) -> Result<()> {
     let mut config = saga::load_saga(saga_path)?;
     let saga_dir = saga::saga_dir(saga_path);
 
+    // Snapshot the active session JSONL automatically
+    let cwd = saga_path
+        .canonicalize()
+        .unwrap_or_else(|_| saga_path.to_path_buf());
+    match session::snapshot_session(&saga_dir, &cwd) {
+        Ok((path, new_lines)) => {
+            println!(
+                "Session snapshot: {} ({new_lines} new lines)",
+                path.file_name().unwrap_or_default().to_string_lossy()
+            );
+        }
+        Err(e) => {
+            eprintln!("Warning: could not snapshot session: {e}");
+        }
+    }
+
     // Handle the "first step" case: current_step == 0, no step to complete
     if config.current_step == 0 {
-        // Save transcript if provided
+        // Save transcript if provided (legacy support)
         if let Some(transcript_val) = args.transcript {
             let content = read_input(transcript_val)?;
             let path = step::save_transcript(&saga_dir, &content)?;
@@ -66,7 +82,7 @@ pub fn run(saga_path: &Path, args: &CompleteArgs<'_>) -> Result<()> {
         step::transition_step(&mut step_config, StepStatus::InProgress)?;
     }
 
-    // Save transcript
+    // Save transcript if provided (legacy support)
     if let Some(transcript_val) = args.transcript {
         let content = read_input(transcript_val)?;
         let path = step::save_transcript(&saga_dir, &content)?;

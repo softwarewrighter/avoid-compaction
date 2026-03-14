@@ -1,6 +1,7 @@
 pub mod commands;
 pub mod error;
 pub mod saga;
+pub mod session;
 pub mod step;
 
 use serde::{Deserialize, Serialize};
