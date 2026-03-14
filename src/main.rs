@@ -37,8 +37,9 @@ the user has provided, understand the project goals, then:
     avoid-compaction init --name <saga-name> --plan <plan-text-or-file>
   Then run 'complete' to define the first implementation step.
 
-  Exit code 1 -- The saga is finished. Tell the user: \"All steps are complete. \
-The saga is done.\" Do NOT tell them to restart.
+  Exit code 1 -- The saga is finished. Tell the user the saga is done. \
+If more work is needed later, run 'complete --next-slug <slug> --next-prompt \"...\"' \
+to reopen the saga and add new steps.
 
 SESSION LOOP (every session, every step):
   1. avoid-compaction next

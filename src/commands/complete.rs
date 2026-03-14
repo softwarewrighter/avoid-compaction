@@ -18,6 +18,10 @@ pub fn run(saga_path: &Path, args: &CompleteArgs<'_>) -> Result<()> {
 
     snapshot_session_quietly(&saga_dir, saga_path);
 
+    if config.status == SagaStatus::Completed && args.next_slug.is_some() {
+        return reopen_saga(saga_path, &saga_dir, &mut config, args);
+    }
+
     if config.current_step == 0 {
         return handle_step0_completion(saga_path, &saga_dir, &mut config, args);
     }
@@ -40,6 +44,27 @@ fn snapshot_session_quietly(saga_dir: &Path, saga_path: &Path) {
             eprintln!("Warning: could not snapshot session: {e}");
         }
     }
+}
+
+fn reopen_saga(
+    saga_path: &Path,
+    saga_dir: &Path,
+    config: &mut crate::SagaConfig,
+    args: &CompleteArgs<'_>,
+) -> Result<()> {
+    config.status = SagaStatus::Active;
+    println!("Reopening completed saga '{}'.", config.name);
+
+    if let Some(summary_val) = args.summary {
+        let content = read_input(summary_val)?;
+        let summary_path = saga_dir.join("reopen-summary.md");
+        std::fs::write(&summary_path, &content)?;
+    }
+
+    create_next_step(saga_path, saga_dir, config, args)?;
+    save_planned_steps(saga_dir, &args.planned, args.next_slug)?;
+    print_restart_message(config, saga_path)?;
+    Ok(())
 }
 
 fn handle_step0_completion(

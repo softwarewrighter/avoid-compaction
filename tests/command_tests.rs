@@ -433,3 +433,40 @@ fn next_warns_about_missing_context_files() {
     let code = next::run(tmp.path()).unwrap();
     assert_eq!(code, 0);
 }
+
+#[test]
+fn complete_reopens_finished_saga() {
+    let tmp = tempdir().unwrap();
+    init::run(tmp.path(), "test", "plan").unwrap();
+
+    // Complete step 0 with --done to finish the saga
+    let args = CompleteArgs {
+        transcript: None,
+        summary: Some("Done with planning"),
+        next_prompt: None,
+        next_slug: None,
+        next_context: vec![],
+        planned: vec![],
+        done: true,
+    };
+    complete::run(tmp.path(), &args).unwrap();
+
+    let config = saga::load_saga(tmp.path()).unwrap();
+    assert_eq!(config.status, avoid_compaction::SagaStatus::Completed);
+
+    // Reopen by calling complete with --next-slug on the finished saga
+    let reopen_args = CompleteArgs {
+        transcript: None,
+        summary: Some("Reopening for more work"),
+        next_prompt: Some("Fix the bugs"),
+        next_slug: Some("fix-bugs"),
+        next_context: vec![],
+        planned: vec![],
+        done: false,
+    };
+    complete::run(tmp.path(), &reopen_args).unwrap();
+
+    let config = saga::load_saga(tmp.path()).unwrap();
+    assert_eq!(config.status, avoid_compaction::SagaStatus::Active);
+    assert_eq!(config.current_step, 1);
+}
