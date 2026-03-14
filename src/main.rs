@@ -6,6 +6,7 @@ use avoid_compaction::commands;
 
 #[derive(Parser)]
 #[command(name = "avoid-compaction")]
+#[command(version = concat!(env!("CARGO_PKG_VERSION"), "-", env!("BUILD_VERSION")))]
 #[command(
     about = "Session checkpoint tool for Claude Code — replace auto-compaction with deliberate context handoffs"
 )]
