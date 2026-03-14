@@ -5,7 +5,7 @@ use std::process::ExitCode;
 use avoid_compaction::commands;
 
 #[derive(Parser)]
-#[command(name = "avoid-compaction")]
+#[command(name = "avoid-compaction", version)]
 #[command(
     about = "Session checkpoint tool for Claude Code — replace auto-compaction with deliberate context handoffs"
 )]
