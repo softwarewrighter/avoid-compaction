@@ -40,6 +40,14 @@ pub fn run(saga_path: &Path, args: &CompleteArgs<'_>) -> Result<()> {
             println!("Transcript saved: {}", path.display());
         }
 
+        // Save step 0 summary so the next agent has context
+        if let Some(summary_val) = args.summary {
+            let content = read_input(summary_val)?;
+            let summary_path = saga_dir.join("step0-summary.md");
+            std::fs::write(&summary_path, &content)?;
+            println!("Step 0 summary saved.");
+        }
+
         if args.done {
             config.status = SagaStatus::Completed;
             saga::save_saga(saga_path, &config)?;

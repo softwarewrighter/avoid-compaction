@@ -283,3 +283,60 @@ fn read_input_literal_text() {
     let result = avoid_compaction::read_input("just some text").unwrap();
     assert_eq!(result, "just some text");
 }
+
+#[test]
+fn complete_step0_saves_summary() {
+    let tmp = tempdir().unwrap();
+    saga::init_saga(tmp.path(), "test", "plan").unwrap();
+
+    let args = CompleteArgs {
+        transcript: None,
+        summary: Some("Session 0: Built the skeleton and wrote tests"),
+        next_prompt: Some("Fix the widget"),
+        next_slug: Some("fix-widget"),
+        next_context: vec![],
+        done: false,
+    };
+    complete::run(tmp.path(), &args).unwrap();
+
+    let summary_path = saga::saga_dir(tmp.path()).join("step0-summary.md");
+    assert!(summary_path.is_file());
+    let content = std::fs::read_to_string(&summary_path).unwrap();
+    assert_eq!(content, "Session 0: Built the skeleton and wrote tests");
+}
+
+#[test]
+fn next_shows_step0_summary_for_first_real_step() {
+    let tmp = tempdir().unwrap();
+    saga::init_saga(tmp.path(), "test", "plan").unwrap();
+
+    // Complete step 0 with summary, creating step 1
+    let args = CompleteArgs {
+        transcript: None,
+        summary: Some("Built the initial prototype"),
+        next_prompt: Some("Add error handling"),
+        next_slug: Some("error-handling"),
+        next_context: vec!["src/lib.rs".to_string()],
+        done: false,
+    };
+    complete::run(tmp.path(), &args).unwrap();
+
+    // next should succeed and show step 1
+    let code = next::run(tmp.path()).unwrap();
+    assert_eq!(code, 0);
+
+    // Verify step0-summary.md exists (next reads it internally)
+    let summary_path = saga::saga_dir(tmp.path()).join("step0-summary.md");
+    assert!(summary_path.is_file());
+}
+
+#[test]
+fn init_fails_gracefully_when_saga_exists() {
+    let tmp = tempdir().unwrap();
+    init::run(tmp.path(), "first", "plan 1").unwrap();
+
+    let result = init::run(tmp.path(), "second", "plan 2");
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert!(err.contains("already exists"));
+}

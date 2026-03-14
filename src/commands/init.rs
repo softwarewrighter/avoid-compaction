@@ -4,6 +4,14 @@ use crate::saga;
 use std::path::Path;
 
 pub fn run(saga_path: &Path, name: &str, plan: &str) -> Result<()> {
+    if saga::saga_exists(saga_path) {
+        return Err(crate::error::Error::Other(
+            "A saga already exists at .avoid-compaction/. Complete or abort it first, \
+             or manually remove the directory to start fresh."
+                .to_string(),
+        ));
+    }
+
     let plan_content = read_input(plan)?;
     saga::init_saga(saga_path, name, &plan_content)?;
     println!("Saga '{name}' initialized at {}", saga_path.display());

@@ -35,7 +35,14 @@ pub fn run(saga_path: &Path) -> Result<u8> {
     let step_dir = step::find_step_dir(&saga_dir, config.current_step)?;
     let step_config = step::load_step(&step_dir)?;
 
-    print_checklist(&config.name, &plan_content, &steps, &step_config, &step_dir)
+    print_checklist(
+        &config.name,
+        &plan_content,
+        &steps,
+        &step_config,
+        &step_dir,
+        &saga_dir,
+    )
 }
 
 fn print_first_step(saga_name: &str, plan: &str) {
@@ -67,6 +74,7 @@ fn print_checklist(
     steps: &[(std::path::PathBuf, crate::StepConfig)],
     current: &crate::StepConfig,
     current_dir: &Path,
+    saga_dir: &Path,
 ) -> Result<u8> {
     println!("=== Saga: {saga_name} ===");
     println!();
@@ -94,6 +102,18 @@ fn print_checklist(
         }
     }
     println!();
+
+    // Show step 0 summary if this is the first real step
+    let step0_summary_path = saga_dir.join("step0-summary.md");
+    if step0_summary_path.is_file() {
+        let has_completed_steps = steps.iter().any(|(_, s)| s.status == StepStatus::Completed);
+        if !has_completed_steps {
+            let content = std::fs::read_to_string(&step0_summary_path)?;
+            println!("--- Prior session (step 0) ---");
+            println!("{content}");
+            println!();
+        }
+    }
 
     // Full summary of the most recent completed step
     let last_completed: Option<&(std::path::PathBuf, crate::StepConfig)> = steps
